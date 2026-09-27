@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { MediaSegment, PlaybackMode } from '../types/player';
 
-export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | null>) {
+export function useSegmentLooper(
+  mediaRef: React.RefObject<HTMLMediaElement | null>,
+  mediaSrc?: string | null,
+  isVideo?: boolean
+) {
   // Interval & Repeat configuration
   const [intervalSeconds, setIntervalSeconds] = useState<number>(5);
   const [repeatsPerSegment, setRepeatsPerSegment] = useState<number>(4);
@@ -54,14 +58,6 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
     [intervalSeconds, repeatsPerSegment, defaultPauseDelay]
   );
 
-  // Generate initial segments for default 25s duration
-  useEffect(() => {
-    if (segments.length === 0 && duration > 0) {
-      const generated = generateFullTrackSegments(duration);
-      setSegments(generated);
-    }
-  }, [duration, generateFullTrackSegments, segments.length]);
-
   // Active segment
   const activeSegment: MediaSegment | null =
     segments.length > 0 && currentSegmentIndex < segments.length
@@ -75,10 +71,11 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
     setCurrentSegmentIndex(index);
     setCurrentRepeat(0);
 
-    if (mediaRef.current) {
-      mediaRef.current.currentTime = target.startTime;
+    const media = mediaRef.current;
+    if (media) {
+      media.currentTime = target.startTime;
       if (andPlay) {
-        mediaRef.current.play().catch(() => {});
+        media.play().catch(() => {});
       }
     }
   }, [segments, mediaRef]);
@@ -96,7 +93,7 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
     selectSegment(prevIdx, isPlaying);
   }, [currentSegmentIndex, segments.length, selectSegment, isPlaying]);
 
-  // Accurate loop checker using requestAnimationFrame
+  // High performance loop checker using requestAnimationFrame
   useEffect(() => {
     const media = mediaRef.current;
     if (!media) return;
@@ -108,14 +105,23 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
       }
 
       const curr = media.currentTime;
-      // Note: React state currentTime is updated smoothly via timeupdate event to prevent 60fps re-rendering lag
 
       if (playbackMode === 'step-loop' && activeSegment) {
-        if (curr >= activeSegment.endTime - 0.05) {
+        if (curr >= activeSegment.endTime - 0.04) {
           isTransitioningRef.current = true;
 
           const requiredRepeats = Math.max(1, activeSegment.repeatCount);
           const delay = activeSegment.pauseDelay ?? defaultPauseDelay;
+
+          const doSmoothSeek = (targetTime: number) => {
+            if (!media) return;
+            media.currentTime = targetTime;
+            const onSeeked = () => {
+              media.removeEventListener('seeked', onSeeked);
+              isTransitioningRef.current = false;
+            };
+            media.addEventListener('seeked', onSeeked, { once: true });
+          };
 
           if (currentRepeat + 1 < requiredRepeats) {
             // Repeat current segment again
@@ -132,14 +138,12 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
                 }
               }, delay * 1000);
             } else {
-              media.currentTime = activeSegment.startTime;
-              isTransitioningRef.current = false;
+              doSmoothSeek(activeSegment.startTime);
             }
           } else {
             // Segment finished all repeats! Auto advance to next segment
             if (autoAdvance) {
               if (currentSegmentIndex + 1 < segments.length) {
-                // Advance to next segment (e.g. 5-10s -> 10-15s -> 15-20s -> ... to end of file)
                 const nextSegIndex = currentSegmentIndex + 1;
                 const nextSeg = segments[nextSegIndex];
                 setCurrentSegmentIndex(nextSegIndex);
@@ -155,8 +159,7 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
                     }
                   }, delay * 1000);
                 } else {
-                  media.currentTime = nextSeg.startTime;
-                  isTransitioningRef.current = false;
+                  doSmoothSeek(nextSeg.startTime);
                 }
               } else if (loopAll) {
                 // Reached the very end of the file; loop back to start
@@ -173,8 +176,7 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
                     }
                   }, delay * 1000);
                 } else {
-                  media.currentTime = firstSeg.startTime;
-                  isTransitioningRef.current = false;
+                  doSmoothSeek(firstSeg.startTime);
                 }
               } else {
                 // Reached the end of the entire file: stop cleanly
@@ -184,13 +186,12 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
             } else {
               // Stay on current segment but repeat from 0
               setCurrentRepeat(0);
-              media.currentTime = activeSegment.startTime;
-              isTransitioningRef.current = false;
+              doSmoothSeek(activeSegment.startTime);
             }
           }
         }
       } else if (playbackMode === 'single-loop' && activeSegment) {
-        if (curr >= activeSegment.endTime - 0.05) {
+        if (curr >= activeSegment.endTime - 0.04) {
           media.currentTime = activeSegment.startTime;
         }
       }
@@ -203,35 +204,64 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [activeSegment, currentRepeat, currentSegmentIndex, segments, playbackMode, autoAdvance, loopAll, defaultPauseDelay, mediaRef]);
+  }, [
+    activeSegment,
+    currentRepeat,
+    currentSegmentIndex,
+    segments,
+    playbackMode,
+    autoAdvance,
+    loopAll,
+    defaultPauseDelay,
+    mediaRef,
+  ]);
 
-  // Media event listeners
+  // Media event listeners & Full Track Duration Binding
   useEffect(() => {
     const media = mediaRef.current;
     if (!media) return;
 
+    // Preserve natural pitch across all speeds (0.25x - 3.0x)
+    if ('preservesPitch' in media) {
+      (media as HTMLMediaElement).preservesPitch = true;
+    }
+
     const handlePlay = () => setIsPlaying(true);
     const handlePause = () => setIsPlaying(false);
+
     const handleDurationChange = () => {
-      if (media.duration && !isNaN(media.duration) && media.duration > 0) {
-        setDuration(media.duration);
-        // Automatically partition across the full length of the newly loaded media
+      const dur = media.duration;
+      if (dur && !isNaN(dur) && isFinite(dur) && dur > 0) {
+        setDuration(dur);
+        // Automatically partition across the full real length of the newly loaded video/audio!
         if (autoGenerateToEnd) {
-          const generated = generateFullTrackSegments(media.duration, intervalSeconds, repeatsPerSegment);
+          const generated = generateFullTrackSegments(
+            dur,
+            intervalSeconds,
+            repeatsPerSegment,
+            defaultPauseDelay
+          );
           setSegments(generated);
           setCurrentSegmentIndex(0);
           setCurrentRepeat(0);
         }
       }
     };
+
     const handleTimeUpdate = () => {
       setCurrentTime(media.currentTime);
     };
+
+    // If metadata was ALREADY loaded before effect ran (common with local files and fast video decoders):
+    if (media.duration && !isNaN(media.duration) && isFinite(media.duration) && media.duration > 0) {
+      handleDurationChange();
+    }
 
     media.addEventListener('play', handlePlay);
     media.addEventListener('pause', handlePause);
     media.addEventListener('durationchange', handleDurationChange);
     media.addEventListener('loadedmetadata', handleDurationChange);
+    media.addEventListener('canplay', handleDurationChange);
     media.addEventListener('timeupdate', handleTimeUpdate);
 
     return () => {
@@ -239,9 +269,19 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
       media.removeEventListener('pause', handlePause);
       media.removeEventListener('durationchange', handleDurationChange);
       media.removeEventListener('loadedmetadata', handleDurationChange);
+      media.removeEventListener('canplay', handleDurationChange);
       media.removeEventListener('timeupdate', handleTimeUpdate);
     };
-  }, [mediaRef, autoGenerateToEnd, generateFullTrackSegments, intervalSeconds, repeatsPerSegment]);
+  }, [
+    mediaRef,
+    mediaSrc,
+    isVideo,
+    autoGenerateToEnd,
+    generateFullTrackSegments,
+    intervalSeconds,
+    repeatsPerSegment,
+    defaultPauseDelay,
+  ]);
 
   // Controls
   const togglePlay = useCallback(() => {
@@ -269,26 +309,23 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
     media.currentTime = clamped;
     setCurrentTime(clamped);
 
-    if (playbackMode === 'step-loop') {
-      const foundIdx = segments.findIndex((s) => clamped >= s.startTime && clamped <= s.endTime);
+    // If step-loop mode, find which segment this time belongs to
+    if (segments.length > 0) {
+      const foundIdx = segments.findIndex(
+        (seg) => clamped >= seg.startTime && clamped <= seg.endTime
+      );
       if (foundIdx !== -1) {
         setCurrentSegmentIndex(foundIdx);
         setCurrentRepeat(0);
       }
     }
-  }, [mediaRef, duration, playbackMode, segments]);
+  }, [mediaRef, duration, segments]);
 
-  // Playback Rate / Speed Control (with Pitch Preservation)
   const changePlaybackRate = useCallback((rate: number) => {
-    const media = mediaRef.current;
     const clamped = Math.max(0.25, Math.min(rate, 3.0));
     setPlaybackRate(clamped);
-    if (media) {
-      if ('preservesPitch' in media) {
-        // Natural pitch preservation when speeding up or slowing down
-        (media as unknown as { preservesPitch: boolean }).preservesPitch = true;
-      }
-      media.playbackRate = clamped;
+    if (mediaRef.current) {
+      mediaRef.current.playbackRate = clamped;
     }
   }, [mediaRef]);
 
@@ -301,109 +338,109 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
   }, [playbackRate, changePlaybackRate]);
 
   const changeVolume = useCallback((vol: number) => {
-    const media = mediaRef.current;
-    if (!media) return;
     const clamped = Math.max(0, Math.min(vol, 1));
-    media.volume = clamped;
     setVolume(clamped);
-    if (clamped > 0 && isMuted) {
-      media.muted = false;
-      setIsMuted(false);
+    if (mediaRef.current) {
+      mediaRef.current.volume = clamped;
+      if (clamped > 0 && isMuted) {
+        mediaRef.current.muted = false;
+        setIsMuted(false);
+      }
     }
   }, [mediaRef, isMuted]);
 
   const toggleMute = useCallback(() => {
-    const media = mediaRef.current;
-    if (!media) return;
-    media.muted = !media.muted;
-    setIsMuted(media.muted);
-  }, [mediaRef]);
-
-  // Re-partition the whole file with given interval and repeats
-  const applyIntervalAndRepeats = useCallback(
-    (newInterval: number, newRepeats: number, newPause = defaultPauseDelay) => {
-      setIntervalSeconds(newInterval);
-      setRepeatsPerSegment(newRepeats);
-      setDefaultPauseDelay(newPause);
-      const generated = generateFullTrackSegments(duration, newInterval, newRepeats, newPause);
-      setSegments(generated);
-      setCurrentSegmentIndex(0);
-      setCurrentRepeat(0);
-    },
-    [duration, defaultPauseDelay, generateFullTrackSegments]
-  );
+    if (!mediaRef.current) return;
+    const nextMuted = !isMuted;
+    mediaRef.current.muted = nextMuted;
+    setIsMuted(nextMuted);
+  }, [mediaRef, isMuted]);
 
   // Segment Management
-  const addSegment = useCallback((
-    startTime: number,
-    endTime: number,
-    repeatCount = repeatsPerSegment,
-    pauseDelay = defaultPauseDelay,
-    name?: string
-  ) => {
-    const start = Math.max(0, Math.min(startTime, duration));
-    const end = Math.max(start + 0.5, Math.min(endTime, duration));
-    const newSeg: MediaSegment = {
-      id: 'seg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-      name: name || `Segment ${segments.length + 1} (${Math.round(start)}s - ${Math.round(end)}s)`,
-      startTime: Number(start.toFixed(2)),
-      endTime: Number(end.toFixed(2)),
-      repeatCount,
-      pauseDelay,
-      color: ['#00f0ff', '#3b82f6', '#a855f7', '#ec4899', '#10b981', '#f59e0b'][segments.length % 6],
-    };
-    const updated = [...segments, newSeg].sort((a, b) => a.startTime - b.startTime);
-    setSegments(updated);
-    return newSeg;
-  }, [duration, segments, repeatsPerSegment, defaultPauseDelay]);
+  const addSegment = useCallback(
+    (start: number, end: number, repeats = 4, pause = defaultPauseDelay, name?: string) => {
+      const idx = segments.length + 1;
+      const colors = ['#00f0ff', '#3b82f6', '#a855f7', '#ec4899', '#10b981', '#f59e0b', '#06b6d4', '#8b5cf6'];
+      const newSeg: MediaSegment = {
+        id: `seg_manual_${idx}_${Date.now()}`,
+        name: name || `Section ${idx} (${Math.round(start)}s - ${Math.round(end)}s)`,
+        startTime: Number(start.toFixed(2)),
+        endTime: Number(end.toFixed(2)),
+        repeatCount: repeats,
+        pauseDelay: pause,
+        color: colors[(idx - 1) % colors.length],
+      };
+      setSegments((prev) => [...prev, newSeg].sort((a, b) => a.startTime - b.startTime));
+    },
+    [segments.length, defaultPauseDelay]
+  );
 
-  const updateSegment = useCallback((id: string, partial: Partial<MediaSegment>) => {
+  const updateSegment = useCallback((id: string, updates: Partial<MediaSegment>) => {
     setSegments((prev) =>
-      prev
-        .map((s) => (s.id === id ? { ...s, ...partial } : s))
-        .sort((a, b) => a.startTime - b.startTime)
+      prev.map((seg) => (seg.id === id ? { ...seg, ...updates } : seg))
     );
   }, []);
 
   const removeSegment = useCallback((id: string) => {
-    setSegments((prev) => {
-      const filtered = prev.filter((s) => s.id !== id);
-      if (currentSegmentIndex >= filtered.length && filtered.length > 0) {
-        setCurrentSegmentIndex(filtered.length - 1);
+    setSegments((prev) => prev.filter((seg) => seg.id !== id));
+  }, []);
+
+  // Auto-slice entire video or audio track
+  const autoSlice = useCallback(
+    (interval: number, repeats: number, pause = defaultPauseDelay) => {
+      const dur = mediaRef.current?.duration || duration;
+      if (dur > 0) {
+        setIntervalSeconds(interval);
+        setRepeatsPerSegment(repeats);
+        setDefaultPauseDelay(pause);
+        const generated = generateFullTrackSegments(dur, interval, repeats, pause);
+        setSegments(generated);
+        setCurrentSegmentIndex(0);
+        setCurrentRepeat(0);
       }
-      return filtered;
-    });
-  }, [currentSegmentIndex]);
+    },
+    [mediaRef, duration, generateFullTrackSegments, defaultPauseDelay]
+  );
+
+  const applyIntervalAndRepeats = useCallback(
+    (interval: number, repeats: number, pause = defaultPauseDelay) => {
+      setIntervalSeconds(interval);
+      setRepeatsPerSegment(repeats);
+      setDefaultPauseDelay(pause);
+      const dur = mediaRef.current?.duration || duration;
+      if (dur > 0) {
+        const generated = generateFullTrackSegments(dur, interval, repeats, pause);
+        setSegments(generated);
+        setCurrentSegmentIndex(0);
+        setCurrentRepeat(0);
+      }
+    },
+    [mediaRef, duration, generateFullTrackSegments, defaultPauseDelay]
+  );
 
   return {
     segments,
     setSegments,
-    activeSegment,
     currentSegmentIndex,
     currentRepeat,
+    setCurrentRepeat,
+    activeSegment,
     playbackMode,
     setPlaybackMode,
     autoAdvance,
     setAutoAdvance,
     loopAll,
     setLoopAll,
+    intervalSeconds,
+    repeatsPerSegment,
     defaultPauseDelay,
     setDefaultPauseDelay,
-    intervalSeconds,
-    setIntervalSeconds,
-    repeatsPerSegment,
-    setRepeatsPerSegment,
     autoGenerateToEnd,
     setAutoGenerateToEnd,
-    applyIntervalAndRepeats,
-    autoSlice: applyIntervalAndRepeats,
     isPlaying,
     currentTime,
     duration,
     playbackRate,
-    changePlaybackRate,
-    speedUp,
-    slowDown,
     volume,
     isMuted,
     togglePlay,
@@ -411,11 +448,15 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
     selectSegment,
     nextSegment,
     prevSegment,
+    changePlaybackRate,
+    speedUp,
+    slowDown,
     changeVolume,
     toggleMute,
     addSegment,
     updateSegment,
     removeSegment,
-    setCurrentRepeat,
+    autoSlice,
+    applyIntervalAndRepeats,
   };
 }

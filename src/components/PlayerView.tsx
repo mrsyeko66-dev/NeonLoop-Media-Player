@@ -117,7 +117,8 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             ref={videoRef}
             src={mediaSrc || undefined}
             playsInline
-            crossOrigin="anonymous"
+            preload="auto"
+            crossOrigin={mediaSrc?.startsWith('blob:') ? undefined : 'anonymous'}
             onClick={onTogglePlay}
             className="w-full h-full object-contain cursor-pointer"
           />

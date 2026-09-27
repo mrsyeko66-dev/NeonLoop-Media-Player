@@ -58,14 +58,14 @@ export default function App() {
     activeMediaRef.current = isVideo ? videoRef.current : audioRef.current;
   }, [isVideo, mediaSrc]);
 
-  // Step looper engine hook
-  const looper = useSegmentLooper(activeMediaRef);
+  // Step looper engine hook - with live source & video awareness for full duration slicing
+  const looper = useSegmentLooper(activeMediaRef, mediaSrc, isVideo);
 
   // Subtitles & Audio Track Switcher hook
   const mediaTracks = useMediaTracks(videoRef, looper.currentTime);
 
-  // Audio equalizer and frequency visualizer hook
-  const audioVis = useAudioVisualizer(activeMediaRef);
+  // Audio equalizer and frequency visualizer hook - with isVideo optimization
+  const audioVis = useAudioVisualizer(activeMediaRef, isVideo);
 
   // Scan embedded audio tracks when video metadata loads
   useEffect(() => {
@@ -377,6 +377,7 @@ export default function App() {
         isOpen={isExportOpen}
         onClose={() => setIsExportOpen(false)}
         mediaFile={mediaFile}
+        mediaSrc={mediaSrc}
         videoElement={videoRef.current}
         isVideo={isVideo}
         segments={looper.segments}

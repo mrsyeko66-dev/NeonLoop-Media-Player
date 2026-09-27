@@ -7,7 +7,10 @@ export interface EqualizerSettings {
   boost: number;   // 1.0 to 2.0 (volume multiplier)
 }
 
-export function useAudioVisualizer(mediaRef: React.RefObject<HTMLMediaElement | null>) {
+export function useAudioVisualizer(
+  mediaRef: React.RefObject<HTMLMediaElement | null>,
+  isVideo = false
+) {
   const [eq, setEq] = useState<EqualizerSettings>({
     bass: 0,
     mid: 0,
@@ -25,12 +28,22 @@ export function useAudioVisualizer(mediaRef: React.RefObject<HTMLMediaElement | 
   const trebleFilterRef = useRef<BiquadFilterNode | null>(null);
   const boostGainRef = useRef<GainNode | null>(null);
 
+  const lastReactiveUpdateRef = useRef<number>(0);
+
   const initWebAudio = useCallback(() => {
     const media = mediaRef.current;
     if (!media || sourceRef.current) return;
 
+    // For video, avoid createMediaElementSource unless user explicitly tuned EQ
+    // because createMediaElementSource causes buffer latency (~80ms A/V desync in Chromium)
+    if (isVideo && eq.bass === 0 && eq.mid === 0 && eq.treble === 0 && eq.boost === 1.0) {
+      return;
+    }
+
     try {
-      const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioContextClass();
       audioCtxRef.current = ctx;
 
@@ -77,29 +90,37 @@ export function useAudioVisualizer(mediaRef: React.RefObject<HTMLMediaElement | 
       boost.connect(analyser);
       analyser.connect(ctx.destination);
     } catch (e) {
-      console.warn('AudioContext initialization error (normal if cross-origin or already hooked):', e);
+      console.warn('AudioContext initialization skipped or already connected:', e);
     }
-  }, [mediaRef, eq.bass, eq.mid, eq.treble, eq.boost]);
+  }, [mediaRef, isVideo, eq.bass, eq.mid, eq.treble, eq.boost]);
 
   // Update EQ filters
-  const updateEqualizer = useCallback((partial: Partial<EqualizerSettings>) => {
-    setEq((prev) => {
-      const next = { ...prev, ...partial };
-      if (bassFilterRef.current && partial.bass !== undefined) {
-        bassFilterRef.current.gain.value = partial.bass;
+  const updateEqualizer = useCallback(
+    (partial: Partial<EqualizerSettings>) => {
+      // Initialize web audio if user modifies EQ
+      if (!sourceRef.current) {
+        initWebAudio();
       }
-      if (midFilterRef.current && partial.mid !== undefined) {
-        midFilterRef.current.gain.value = partial.mid;
-      }
-      if (trebleFilterRef.current && partial.treble !== undefined) {
-        trebleFilterRef.current.gain.value = partial.treble;
-      }
-      if (boostGainRef.current && partial.boost !== undefined) {
-        boostGainRef.current.gain.value = partial.boost;
-      }
-      return next;
-    });
-  }, []);
+
+      setEq((prev) => {
+        const next = { ...prev, ...partial };
+        if (bassFilterRef.current && partial.bass !== undefined) {
+          bassFilterRef.current.gain.value = partial.bass;
+        }
+        if (midFilterRef.current && partial.mid !== undefined) {
+          midFilterRef.current.gain.value = partial.mid;
+        }
+        if (trebleFilterRef.current && partial.treble !== undefined) {
+          trebleFilterRef.current.gain.value = partial.treble;
+        }
+        if (boostGainRef.current && partial.boost !== undefined) {
+          boostGainRef.current.gain.value = partial.boost;
+        }
+        return next;
+      });
+    },
+    [initWebAudio]
+  );
 
   // Resume AudioContext on user interaction
   useEffect(() => {
@@ -107,7 +128,7 @@ export function useAudioVisualizer(mediaRef: React.RefObject<HTMLMediaElement | 
       if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
         audioCtxRef.current.resume();
       }
-      if (!sourceRef.current) {
+      if (!sourceRef.current && !isVideo) {
         initWebAudio();
       }
     };
@@ -119,24 +140,28 @@ export function useAudioVisualizer(mediaRef: React.RefObject<HTMLMediaElement | 
       window.removeEventListener('click', handleUserInteraction);
       window.removeEventListener('keydown', handleUserInteraction);
     };
-  }, [initWebAudio]);
+  }, [initWebAudio, isVideo]);
 
-  // Reactive audio loop for visualizer data and neon pulse
+  // High performance, throttled audio reactive loop (avoids 60fps React re-renders)
   useEffect(() => {
     let animId: number;
-    const updateAudioLevel = () => {
+    const updateAudioLevel = (timestamp: number) => {
       const analyser = analyserRef.current;
       if (analyser && audioCtxRef.current?.state === 'running') {
-        const data = new Uint8Array(analyser.frequencyBinCount);
-        analyser.getByteFrequencyData(data);
-        // Average low-mid frequencies for pulse
-        let sum = 0;
-        const count = Math.min(24, data.length);
-        for (let i = 0; i < count; i++) {
-          sum += data[i];
+        // Throttle React state updates to 10 FPS (every 100ms) to prevent video frame drops
+        if (timestamp - lastReactiveUpdateRef.current > 100) {
+          lastReactiveUpdateRef.current = timestamp;
+          const data = new Uint8Array(analyser.frequencyBinCount);
+          analyser.getByteFrequencyData(data);
+
+          let sum = 0;
+          const count = Math.min(24, data.length);
+          for (let i = 0; i < count; i++) {
+            sum += data[i];
+          }
+          const level = sum / (count * 255);
+          setAudioReactiveLevel(level);
         }
-        const level = sum / (count * 255);
-        setAudioReactiveLevel(level);
       }
       animId = requestAnimationFrame(updateAudioLevel);
     };
