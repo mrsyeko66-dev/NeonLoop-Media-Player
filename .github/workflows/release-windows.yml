@@ -77,7 +77,7 @@ jobs:
       - name: Install Dependencies & Build Frontend
         run: |
           rm -f package-lock.json
-          npm install --legacy-peer-deps --no-audit --no-fund
+          ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install --legacy-peer-deps --no-audit --no-fund
           npm run build
 
       - name: Upload Built Dist Artifact
@@ -127,14 +127,14 @@ jobs:
         shell: bash
         run: |
           rm -f package-lock.json
-          npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund electron@33.2.0 electron-builder@25.1.8
+          npm install -D --no-package-lock --legacy-peer-deps --no-audit --no-fund electron@33.2.0 electron-builder@25.1.8
 
       - name: Build Windows Executables (Installer & Portable)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx electron-builder --win --x64
+          npx electron-builder --win --x64 --publish never
 
       - name: Verify Generated Executables
         shell: bash
