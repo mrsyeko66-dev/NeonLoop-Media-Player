@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Play,
   Pause,
@@ -6,11 +6,8 @@ import {
   Minimize,
   PictureInPicture2,
   Music,
-  Film,
+  Subtitles,
   Volume2,
-  VolumeX,
-  Repeat,
-  Sparkles,
 } from 'lucide-react';
 import { MediaSegment, NeonThemeSettings, PlaybackMode } from '../types/player';
 import { AudioVisualizerCanvas } from './AudioVisualizerCanvas';
@@ -31,6 +28,10 @@ interface PlayerViewProps {
   analyserRef: React.RefObject<AnalyserNode | null>;
   currentSegmentIndex: number;
   totalSegments: number;
+  currentCueText?: string | null;
+  subtitleFontSize?: number;
+  onOpenTracksSettings?: () => void;
+  hasAudioLanguages?: boolean;
 }
 
 export const PlayerView: React.FC<PlayerViewProps> = ({
@@ -48,6 +49,10 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
   analyserRef,
   currentSegmentIndex,
   totalSegments,
+  currentCueText,
+  subtitleFontSize = 18,
+  onOpenTracksSettings,
+  hasAudioLanguages = false,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -112,6 +117,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             ref={videoRef}
             src={mediaSrc || undefined}
             playsInline
+            crossOrigin="anonymous"
             onClick={onTogglePlay}
             className="w-full h-full object-contain cursor-pointer"
           />
@@ -120,7 +126,7 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
             onClick={onTogglePlay}
             className="w-full h-full flex flex-col items-center justify-center p-6 cursor-pointer relative"
           >
-            <audio ref={audioRef} src={mediaSrc || undefined} />
+            <audio ref={audioRef} src={mediaSrc || undefined} crossOrigin="anonymous" />
 
             {/* Glowing Center Ring */}
             <div
@@ -149,6 +155,25 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           </div>
         )}
 
+        {/* Dynamic Subtitle Display Overlay */}
+        {currentCueText && (
+          <div className="absolute bottom-6 left-4 right-4 z-20 flex justify-center pointer-events-none">
+            <div
+              className="max-w-2xl px-4 py-2 rounded-xl text-center font-medium leading-relaxed shadow-2xl backdrop-blur-md border animate-fadeIn"
+              style={{
+                backgroundColor: 'rgba(5, 8, 16, 0.85)',
+                borderColor: 'var(--neon-color)',
+                color: '#ffffff',
+                fontSize: `${subtitleFontSize}px`,
+                textShadow: '0 2px 4px rgba(0,0,0,0.9), 0 0 10px var(--neon-color-dim)',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.8), 0 0 15px var(--neon-color-dim)',
+              }}
+            >
+              {currentCueText}
+            </div>
+          </div>
+        )}
+
         {/* Live Active Segment & Repetition HUD Overlay */}
         {playbackMode === 'step-loop' && activeSegment && (
           <div className="absolute top-4 left-4 z-20 flex items-center gap-2 pointer-events-none">
@@ -172,8 +197,21 @@ export const PlayerView: React.FC<PlayerViewProps> = ({
           </div>
         )}
 
-        {/* Mode Badge (Top-Right) */}
+        {/* Top-Right HUD Controls: Audio Track & Subtitle Switcher, PiP, Fullscreen */}
         <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+          {/* Subtitles & Audio Track Switcher Button */}
+          {onOpenTracksSettings && (
+            <button
+              onClick={onOpenTracksSettings}
+              className="p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-cyan-300 border border-slate-700 backdrop-blur-md transition-all shadow-md cursor-pointer flex items-center gap-1.5 text-xs font-semibold"
+              title="Switch Audio Languages / Configure Subtitles"
+            >
+              <Subtitles className="w-4 h-4 text-cyan-400" />
+              {hasAudioLanguages && <Volume2 className="w-3.5 h-3.5 text-purple-400" />}
+              <span className="hidden sm:inline">Audio & Subs</span>
+            </button>
+          )}
+
           {isVideo && (
             <button
               onClick={togglePip}

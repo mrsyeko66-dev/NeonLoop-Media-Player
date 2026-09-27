@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { MediaSegment } from '../types/player';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface InteractiveTimelineProps {
   currentTime: number;
@@ -51,6 +52,27 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
 
+  // Performance Optimization: If more than 60 segments, render segments via high-speed SVG overlay
+  const isLargeSegmentCount = segments.length > 50;
+
+  // Windowed visible segment chips under timeline
+  const windowedChips = useMemo(() => {
+    if (segments.length <= 30) {
+      return { items: segments, offset: 0 };
+    }
+    const windowSize = 25;
+    const half = Math.floor(windowSize / 2);
+    let start = Math.max(0, currentSegmentIndex - half);
+    let end = Math.min(segments.length, start + windowSize);
+    if (end - start < windowSize) {
+      start = Math.max(0, end - windowSize);
+    }
+    return {
+      items: segments.slice(start, end),
+      offset: start,
+    };
+  }, [segments, currentSegmentIndex]);
+
   return (
     <div className="w-full select-none mt-2">
       {/* Time indicators */}
@@ -59,7 +81,9 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: 'var(--neon-color)' }} />
           {formatTime(currentTime)}
         </span>
-        <span className="text-slate-400">{formatTime(duration)}</span>
+        <span className="text-slate-400 font-mono">
+          {formatTime(duration)} ({segments.length} Parts Total)
+        </span>
       </div>
 
       {/* Main Track Bar with Segments */}
@@ -77,8 +101,31 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
           ))}
         </div>
 
-        {/* Render Segment Overlays */}
-        {duration > 0 &&
+        {/* High performance SVG layer when segments > 50 */}
+        {isLargeSegmentCount && duration > 0 ? (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none">
+            {segments.map((seg, idx) => {
+              const leftPct = (Math.max(0, seg.startTime) / duration) * 100;
+              const widthPct = (Math.max(0.1, seg.endTime - seg.startTime) / duration) * 100;
+              const isActive = idx === currentSegmentIndex;
+              return (
+                <rect
+                  key={seg.id}
+                  x={`${leftPct}%`}
+                  y="2"
+                  width={`${widthPct}%`}
+                  height="28"
+                  rx="3"
+                  fill={isActive ? 'rgba(0, 240, 255, 0.35)' : 'rgba(30, 41, 59, 0.45)'}
+                  stroke={isActive ? 'var(--neon-color)' : 'rgba(51, 65, 85, 0.6)'}
+                  strokeWidth={isActive ? '1.5' : '0.5'}
+                />
+              );
+            })}
+          </svg>
+        ) : (
+          /* Interactive DOM Segments for normal sizes */
+          duration > 0 &&
           segments.map((seg, idx) => {
             const leftPct = (Math.max(0, seg.startTime) / duration) * 100;
             const widthPct = (Math.max(0.1, seg.endTime - seg.startTime) / duration) * 100;
@@ -115,7 +162,8 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
                 </span>
               </div>
             );
-          })}
+          })
+        )}
 
         {/* Current Playhead Scrubber */}
         <div
@@ -144,14 +192,25 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
         )}
       </div>
 
-      {/* Quick Segment Chip Badges under timeline */}
+      {/* Windowed Segment Chip Badges under timeline */}
       <div className="flex items-center gap-1.5 mt-2.5 overflow-x-auto pb-1 max-w-full custom-scrollbar">
-        {segments.map((seg, idx) => {
-          const isActive = idx === currentSegmentIndex;
+        {windowedChips.offset > 0 && (
+          <button
+            onClick={() => onSelectSegment(Math.max(0, windowedChips.offset - 15))}
+            className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] text-cyan-400 font-mono flex items-center shrink-0 hover:bg-slate-800"
+            title="Previous segment batch"
+          >
+            <ChevronLeft className="w-3 h-3" /> Earlier Parts
+          </button>
+        )}
+
+        {windowedChips.items.map((seg, relIdx) => {
+          const actualIdx = windowedChips.offset + relIdx;
+          const isActive = actualIdx === currentSegmentIndex;
           return (
             <button
               key={seg.id}
-              onClick={() => onSelectSegment(idx)}
+              onClick={() => onSelectSegment(actualIdx)}
               className={`shrink-0 px-2.5 py-1 rounded-lg text-xs font-mono font-medium border flex items-center gap-1.5 transition-all cursor-pointer ${
                 isActive
                   ? 'border-white text-white shadow-md'
@@ -171,7 +230,7 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
                 className="w-2 h-2 rounded-full shrink-0"
                 style={{ backgroundColor: seg.color || 'var(--neon-color)' }}
               />
-              <span>P{idx + 1}</span>
+              <span>P{actualIdx + 1}</span>
               <span className="text-[10px] text-slate-400">
                 ({seg.startTime}s - {seg.endTime}s)
               </span>
@@ -181,6 +240,20 @@ export const InteractiveTimeline: React.FC<InteractiveTimelineProps> = ({
             </button>
           );
         })}
+
+        {windowedChips.offset + windowedChips.items.length < segments.length && (
+          <button
+            onClick={() =>
+              onSelectSegment(
+                Math.min(segments.length - 1, windowedChips.offset + windowedChips.items.length)
+              )
+            }
+            className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] text-cyan-400 font-mono flex items-center shrink-0 hover:bg-slate-800"
+            title="Later segment batch"
+          >
+            Later Parts <ChevronRight className="w-3 h-3" />
+          </button>
+        )}
       </div>
     </div>
   );

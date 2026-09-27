@@ -103,11 +103,29 @@ export const LoopControllerPanel: React.FC<LoopControllerPanelProps> = ({
   const [customInterval, setCustomInterval] = useState<number>(intervalSeconds || 5);
   const [customRepeats, setCustomRepeats] = useState<number>(repeatsPerSegment || 4);
 
+  // High performance windowed pagination for long files
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState<number>(0);
+  const [showAllCards, setShowAllCards] = useState<boolean>(false);
+  const totalPages = Math.max(1, Math.ceil(segments.length / PAGE_SIZE));
+
   // Sync state if prop changes
   React.useEffect(() => {
     setCustomInterval(intervalSeconds);
     setCustomRepeats(repeatsPerSegment);
   }, [intervalSeconds, repeatsPerSegment]);
+
+  // Keep pagination window in sync with active segment for smooth follow
+  React.useEffect(() => {
+    if (!showAllCards && segments.length > PAGE_SIZE) {
+      const activePage = Math.floor(currentSegmentIndex / PAGE_SIZE);
+      setPage(activePage);
+    }
+  }, [currentSegmentIndex, showAllCards, segments.length]);
+
+  const displayedSegments = showAllCards
+    ? segments
+    : segments.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   // Mark start / end cues from current playhead
   const handleAddFromPlayhead = () => {
@@ -555,15 +573,67 @@ export const LoopControllerPanel: React.FC<LoopControllerPanelProps> = ({
         </div>
       </div>
 
+      {/* Pagination Bar for High Performance with Long Files */}
+      {segments.length > PAGE_SIZE && (
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 text-xs">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0 || showAllCards}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 font-mono disabled:opacity-40"
+            >
+              ← Prev {PAGE_SIZE}
+            </button>
+            <span className="font-mono text-slate-400">
+              {showAllCards ? (
+                `Showing all ${segments.length} parts`
+              ) : (
+                <>
+                  Page <strong className="text-white">{page + 1}</strong> of{' '}
+                  <strong className="text-white">{totalPages}</strong> (Parts{' '}
+                  {page * PAGE_SIZE + 1} - {Math.min(segments.length, (page + 1) * PAGE_SIZE)})
+                </>
+              )}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1 || showAllCards}
+              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 font-mono disabled:opacity-40"
+            >
+              Next {PAGE_SIZE} →
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setShowAllCards(false);
+                setPage(Math.floor(currentSegmentIndex / PAGE_SIZE));
+              }}
+              className="px-2.5 py-1 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 font-mono text-[11px] hover:bg-cyan-900 transition-colors"
+            >
+              📍 Jump to Active (Part {currentSegmentIndex + 1})
+            </button>
+            <button
+              onClick={() => setShowAllCards(!showAllCards)}
+              className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-400 text-[11px]"
+            >
+              {showAllCards ? 'Paginate List' : 'Show All'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Segments List Cards */}
       <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-        {segments.map((seg, idx) => {
-          const isActive = idx === currentSegmentIndex;
+        {displayedSegments.map((seg, relIdx) => {
+          const actualIdx = showAllCards ? relIdx : page * PAGE_SIZE + relIdx;
+          const isActive = actualIdx === currentSegmentIndex;
 
           return (
             <div
               key={seg.id}
-              onClick={() => onSelectSegment(idx)}
+              onClick={() => onSelectSegment(actualIdx)}
               className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
                 isActive
                   ? 'border-white bg-slate-900/90 shadow-lg'
@@ -589,7 +659,7 @@ export const LoopControllerPanel: React.FC<LoopControllerPanelProps> = ({
                       borderColor: isActive ? 'var(--neon-color)' : '#334155',
                     }}
                   >
-                    {idx + 1}
+                    {actualIdx + 1}
                   </span>
 
                   <div className="min-w-0">

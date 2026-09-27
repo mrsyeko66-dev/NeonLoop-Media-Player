@@ -1,7 +1,7 @@
 /**
  * NeonLoop Media Player
  * Professional Audio & Video Player with Automated Step-by-Step Segment Looping,
- * Media Exporter, and Customizable Dark Neon Aesthetics for Windows & Android.
+ * Media Exporter, Online Streams, Subtitles & Audio Tracks, and Dark Neon Aesthetics.
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -15,13 +15,15 @@ import { PresetsModal } from './components/PresetsModal';
 import { ExportMediaModal } from './components/ExportMediaModal';
 import { EqualizerModal } from './components/EqualizerModal';
 import { AutoSliceModal } from './components/AutoSliceModal';
+import { OpenUrlModal } from './components/OpenUrlModal';
+import { TracksSettingsModal } from './components/TracksSettingsModal';
 import { OfflineIndicator } from './components/OfflineIndicator';
 
 import { useSegmentLooper } from './hooks/useSegmentLooper';
 import { useAudioVisualizer } from './hooks/useAudioVisualizer';
 import { useNeonTheme } from './hooks/useNeonTheme';
+import { useMediaTracks } from './hooks/useMediaTracks';
 import { generateDemoCyberAudio } from './utils/demoMedia';
-import { DEFAULT_DEMO_SEGMENTS } from './utils/presetStorage';
 import { LoopPreset } from './types/player';
 
 export default function App() {
@@ -48,6 +50,8 @@ export default function App() {
   const [isExportOpen, setIsExportOpen] = useState<boolean>(false);
   const [isEqualizerOpen, setIsEqualizerOpen] = useState<boolean>(false);
   const [isAutoSliceOpen, setIsAutoSliceOpen] = useState<boolean>(false);
+  const [isOpenUrlOpen, setIsOpenUrlOpen] = useState<boolean>(false);
+  const [isTracksOpen, setIsTracksOpen] = useState<boolean>(false);
 
   // Update active media reference when video or audio changes
   useEffect(() => {
@@ -57,8 +61,20 @@ export default function App() {
   // Step looper engine hook
   const looper = useSegmentLooper(activeMediaRef);
 
+  // Subtitles & Audio Track Switcher hook
+  const mediaTracks = useMediaTracks(videoRef, looper.currentTime);
+
   // Audio equalizer and frequency visualizer hook
   const audioVis = useAudioVisualizer(activeMediaRef);
+
+  // Scan embedded audio tracks when video metadata loads
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      const handleLoaded = () => mediaTracks.scanEmbeddedAudioTracks();
+      videoRef.current.addEventListener('loadedmetadata', handleLoaded);
+      return () => videoRef.current?.removeEventListener('loadedmetadata', handleLoaded);
+    }
+  }, [isVideo, mediaTracks]);
 
   // Load Built-in Demo Cyber Audio Track
   const handleLoadDemo = useCallback(async () => {
@@ -69,7 +85,6 @@ export default function App() {
       setFileName(demo.fileName);
       setIsVideo(false);
       setIsDemoLoaded(true);
-      // Generate segments to the end of the 25-second file (0-5, 5-10, 10-15, 15-20, 20-25)
       looper.applyIntervalAndRepeats(5, 4, 0.2);
     } catch (err) {
       console.error('Failed to generate demo track:', err);
@@ -90,8 +105,14 @@ export default function App() {
     setMediaFile(file);
     setFileName(file.name);
     setIsVideo(isVid);
+  }, []);
 
-    // Initial setup will automatically partition the full file once metadata loads in useSegmentLooper
+  // Handle direct online network stream URL (MKV, MP4, WebM, MP3, etc.)
+  const handleLoadOnlineUrl = useCallback((url: string, title?: string, isVid = true) => {
+    setMediaSrc(url);
+    setMediaFile(null); // Network URL
+    setFileName(title || url.split('/').pop()?.split('?')[0] || 'Online Media Stream');
+    setIsVideo(isVid);
   }, []);
 
   // Drag and drop file support
@@ -99,7 +120,12 @@ export default function App() {
     e.preventDefault();
     const file = e.dataTransfer.files?.[0];
     if (file) {
-      handleSelectFile(file);
+      // Check if dropped file is subtitle
+      if (/\.(srt|vtt)$/i.test(file.name)) {
+        mediaTracks.loadSubtitleFile(file);
+      } else {
+        handleSelectFile(file);
+      }
     }
   };
 
@@ -201,12 +227,14 @@ export default function App() {
         segmentCount={looper.segments.length}
         neonSettings={neonSettings}
         onSelectFile={handleSelectFile}
+        onOpenUrl={() => setIsOpenUrlOpen(true)}
         onLoadDemoTrack={handleLoadDemo}
         onOpenPresets={() => setIsPresetsOpen(true)}
         onOpenExport={() => setIsExportOpen(true)}
         onOpenLighting={() => setIsLightingOpen(true)}
         onOpenEqualizer={() => setIsEqualizerOpen(true)}
         onOpenInstall={() => setIsInstallOpen(true)}
+        onOpenTracksSettings={() => setIsTracksOpen(true)}
       />
 
       {/* Main Player Workspace */}
@@ -229,6 +257,10 @@ export default function App() {
             analyserRef={audioVis.analyserRef}
             currentSegmentIndex={looper.currentSegmentIndex}
             totalSegments={looper.segments.length}
+            currentCueText={mediaTracks.currentCueText}
+            subtitleFontSize={mediaTracks.subtitleFontSize}
+            onOpenTracksSettings={() => setIsTracksOpen(true)}
+            hasAudioLanguages={mediaTracks.audioTracks.length > 1}
           />
 
           {/* Interactive Timeline with Segment Blocks */}
@@ -367,6 +399,22 @@ export default function App() {
         onApplySlice={(interval, repeats, pause) => {
           looper.autoSlice(interval, repeats, pause);
         }}
+      />
+
+      {/* Online Network Stream URL Modal */}
+      <OpenUrlModal
+        isOpen={isOpenUrlOpen}
+        onClose={() => setIsOpenUrlOpen(false)}
+        onLoadUrl={handleLoadOnlineUrl}
+        onLoadSubtitleUrl={(url, label) => mediaTracks.loadSubtitleUrl(url, label)}
+        onLoadAudioUrl={(url, label) => mediaTracks.loadExternalAudioTrack(url, label)}
+      />
+
+      {/* Subtitles & Audio Track Switcher Modal */}
+      <TracksSettingsModal
+        isOpen={isTracksOpen}
+        onClose={() => setIsTracksOpen(false)}
+        mediaTracks={mediaTracks}
       />
 
       {/* PWA Offline indicator */}

@@ -9,7 +9,8 @@ import {
   Monitor,
   Music,
   Film,
-  Layers,
+  Globe,
+  Subtitles,
   Zap,
 } from 'lucide-react';
 import { NeonThemeSettings } from '../types/player';
@@ -20,12 +21,14 @@ interface HeaderProps {
   segmentCount: number;
   neonSettings: NeonThemeSettings;
   onSelectFile: (file: File) => void;
+  onOpenUrl: () => void;
   onLoadDemoTrack: () => void;
   onOpenPresets: () => void;
   onOpenExport: () => void;
   onOpenLighting: () => void;
   onOpenEqualizer: () => void;
   onOpenInstall: () => void;
+  onOpenTracksSettings: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,12 +37,14 @@ export const Header: React.FC<HeaderProps> = ({
   segmentCount,
   neonSettings,
   onSelectFile,
+  onOpenUrl,
   onLoadDemoTrack,
   onOpenPresets,
   onOpenExport,
   onOpenLighting,
   onOpenEqualizer,
   onOpenInstall,
+  onOpenTracksSettings,
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -99,22 +104,44 @@ export const Header: React.FC<HeaderProps> = ({
             className="hidden"
           />
 
+          {/* Open Local File */}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-cyan-400/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            title="Open Audio or Video file"
+            title="Open Local Audio or Video file"
           >
             <FolderOpen className="w-3.5 h-3.5 text-cyan-400" />
             <span className="hidden md:inline">Open File</span>
           </button>
 
+          {/* Open Network Stream URL */}
+          <button
+            onClick={onOpenUrl}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-cyan-300 border border-slate-700 hover:border-cyan-400/50 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+            title="Play Online Network Stream URL (MKV, MP4, WebM, MP3)"
+          >
+            <Globe className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden sm:inline">Open URL</span>
+          </button>
+
+          {/* Demo Track */}
           <button
             onClick={onLoadDemoTrack}
             className="px-3 py-1.5 rounded-xl bg-cyan-950/40 hover:bg-cyan-900/50 text-cyan-300 border border-cyan-500/30 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            title="Load demo audio with 0-5s / 4-repeat preset"
+            title="Load demo audio track"
           >
             <Music className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Load Demo Beat</span>
+            <span className="hidden lg:inline">Demo Beat</span>
+          </button>
+
+          {/* Subtitles & Audio Languages Button */}
+          <button
+            onClick={onOpenTracksSettings}
+            className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 hover:border-cyan-400/50 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Subtitles (.srt/.vtt) & MKV Audio Languages"
+          >
+            <Subtitles className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="hidden xl:inline">Audio & Subs</span>
           </button>
 
           {/* Presets Button */}

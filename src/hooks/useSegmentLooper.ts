@@ -108,7 +108,7 @@ export function useSegmentLooper(mediaRef: React.RefObject<HTMLMediaElement | nu
       }
 
       const curr = media.currentTime;
-      setCurrentTime(curr);
+      // Note: React state currentTime is updated smoothly via timeupdate event to prevent 60fps re-rendering lag
 
       if (playbackMode === 'step-loop' && activeSegment) {
         if (curr >= activeSegment.endTime - 0.05) {
