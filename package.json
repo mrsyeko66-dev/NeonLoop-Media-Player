@@ -1,14 +1,56 @@
 {
-  "name": "react-example",
+  "name": "neonloop-media-player",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
+    "build:electron": "vite build && electron-builder --win",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
+    "clean": "rm -rf dist server.js release",
     "lint": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.neonloop.player",
+    "productName": "NeonLoop Media Player",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "public/pwa-512x512.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NeonLoop Media Player",
+      "artifactName": "NeonLoop-Setup-v${version}.exe"
+    },
+    "portable": {
+      "artifactName": "NeonLoop-Portable-v${version}.exe"
+    }
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

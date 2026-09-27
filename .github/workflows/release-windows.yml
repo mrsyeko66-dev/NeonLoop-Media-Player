@@ -1,0 +1,124 @@
+name: Build & Release Windows App (Installer & Portable)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths-ignore:
+      - 'README.md'
+      - '.gitignore'
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Version Bump Type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Windows Installer & Portable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Auto-Increment Version
+        id: versioning
+        shell: bash
+        run: |
+          # Read base version from package.json
+          BASE_VER=$(node -p "require('./package.json').version")
+          
+          # Auto-increment using GitHub run number for guaranteed unique sequential versions
+          MAJOR=$(echo $BASE_VER | cut -d. -f1)
+          MINOR=$(echo $BASE_VER | cut -d. -f2)
+          PATCH=${{ github.run_number }}
+          
+          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+          echo "Bumping version from $BASE_VER to $NEW_VERSION"
+          
+          # Update package.json version
+          npm version $NEW_VERSION --no-git-tag-version --allow-same-version
+          
+          echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "RELEASE_TAG=v$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Install Project Dependencies
+        shell: bash
+        run: |
+          npm install
+          npm install --save-dev electron@33.2.0 electron-builder@25.1.8
+
+      - name: Compile Vite Frontend
+        shell: bash
+        run: npm run build
+
+      - name: Package Windows Installer & Portable (.exe)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx electron-builder --win --x64
+
+      - name: Verify Generated Binaries
+        shell: bash
+        run: |
+          echo "Generated Windows release files:"
+          ls -lh release/*.exe
+
+      - name: Generate Release Notes
+        id: release_notes
+        shell: bash
+        run: |
+          cat << 'EOF' > RELEASE_NOTES.md
+          ## 🚀 NeonLoop Media Player - Windows Release ${{ env.RELEASE_TAG }}
+
+          ### 📦 Download Options for Windows:
+          - **Portable Version (بدون نیاز به نصب):**
+            `NeonLoop-Portable-v${{ env.APP_VERSION }}.exe` (Run immediately anywhere, no installation needed)
+          - **Installer Version (نسخه نصبی ویندوز):**
+            `NeonLoop-Setup-v${{ env.APP_VERSION }}.exe` (Full Windows Setup with Start Menu and Desktop shortcuts)
+
+          ---
+
+          ### ✨ Key Features in this Release:
+          - 🔁 **Continuous Step-by-Step Looping:** Slices and repeats audio/video from 0:00 to the very end of any file length.
+          - ⚡ **Real-time Playback Speed:** Instant speed adjustments (0.25x to 3.0x) with natural pitch preservation.
+          - 🌐 **Online Network Streams:** Play online MKV, MP4, WebM, and audio URLs directly.
+          - 🎙️ **MKV Multi-Audio Switcher:** Switch between audio languages (Original, Persian dub, etc.).
+          - 📝 **Subtitles & Captions Support:** Load .SRT and .VTT files with customizable font size.
+          - 🌌 **Cyber Neon Dark Theme:** Audio-reactive ambient glow with customizable hue and lighting.
+          - 💾 **Media Exporter:** Render and export looped media directly into high-res WAV or WebM files.
+          EOF
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: NeonLoop Media Player ${{ env.RELEASE_TAG }} (Windows)
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            release/*.exe
+            release/*.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

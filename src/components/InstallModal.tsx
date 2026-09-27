@@ -1,5 +1,17 @@
 import React from 'react';
-import { Monitor, Smartphone, Download, CheckCircle, ExternalLink, X, ShieldCheck, Zap } from 'lucide-react';
+import {
+  Monitor,
+  Smartphone,
+  Download,
+  CheckCircle,
+  ExternalLink,
+  X,
+  ShieldCheck,
+  Zap,
+  Package,
+  Layers,
+  FileCode,
+} from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface InstallModalProps {
@@ -25,13 +37,13 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
             </div>
             <div>
               <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                Install for Windows & Android
+                Windows & Android Downloads
                 <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
-                  PWA Ready
+                  GitHub Releases
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
-                Run NeonLoop as a native standalone application on your PC or phone
+                Download Windows Portable & Installer (.exe) or install PWA on Android & Desktop
               </p>
             </div>
           </div>
@@ -43,17 +55,86 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
           </button>
         </div>
 
-        {/* Status banner */}
+        {/* 1. NEW DEDICATED GITHUB RELEASES WINDOWS EXECUTABLES SECTION */}
+        <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-cyan-950/70 via-slate-900/90 to-blue-950/70 border border-cyan-500/50 shadow-lg">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">
+                Windows Standalone Executables (Automated GitHub Releases)
+              </h3>
+            </div>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-500/30">
+              CI/CD Automated
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Portable Version */}
+            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-cyan-400/50 transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold text-white mb-1">
+                  <span className="flex items-center gap-1.5 text-cyan-300">
+                    <Zap className="w-4 h-4 text-cyan-400" /> Portable Version (.exe)
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 font-mono">
+                    No Install
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+                  Single-file executable (<code>NeonLoop-Portable-v*.exe</code>). Runs instantly on any Windows PC without installation or admin privileges.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px]">
+                <span className="text-slate-400">Windows 10/11 x64</span>
+                <span className="text-cyan-400 font-semibold">Self-contained</span>
+              </div>
+            </div>
+
+            {/* Installer Version */}
+            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 hover:border-purple-400/50 transition-all flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between text-xs font-bold text-white mb-1">
+                  <span className="flex items-center gap-1.5 text-purple-300">
+                    <ShieldCheck className="w-4 h-4 text-purple-400" /> Installer Setup (.exe)
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-400 font-mono">
+                    Setup Wizard
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+                  Full Windows setup wizard (<code>NeonLoop-Setup-v*.exe</code>). Creates Start Menu and Desktop shortcuts with clean auto-uninstaller.
+                </p>
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 text-[11px]">
+                <span className="text-slate-400">NSIS Installer</span>
+                <span className="text-purple-400 font-semibold">Start Menu + Desktop</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3.5 pt-3 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <FileCode className="w-4 h-4 text-cyan-400" />
+              Automated builds configured in <code>.github/workflows/release-windows.yml</code>
+            </span>
+            <span className="text-cyan-300 font-medium">
+              Versions auto-increment with every GitHub Release tag!
+            </span>
+          </div>
+        </div>
+
+        {/* 2. PWA Instant Install (Browser / Standalone) */}
         {isInstalled ? (
           <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-3 text-emerald-400 text-sm">
             <CheckCircle className="w-5 h-5 shrink-0" />
-            <span>NeonLoop is already installed and running in standalone mode!</span>
+            <span>NeonLoop is currently running in standalone PWA app mode!</span>
           </div>
         ) : isInstallable ? (
-          <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-cyan-950/60 to-blue-950/60 border border-cyan-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="mt-4 p-4 rounded-xl bg-slate-900/90 border border-cyan-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-cyan-200">1-Click Direct Installation Available</p>
-              <p className="text-xs text-slate-400">Install immediately to your desktop or mobile app launcher</p>
+              <p className="text-sm font-semibold text-cyan-200">1-Click Direct Browser Installation</p>
+              <p className="text-xs text-slate-400">Install immediately to your PC or mobile app launcher</p>
             </div>
             <button
               onClick={async () => {
@@ -63,13 +144,13 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
               className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-cyan-500/40 cursor-pointer"
             >
               <Zap className="w-4 h-4 fill-current" />
-              Install App Now
+              Install PWA Now
             </button>
           </div>
         ) : null}
 
-        {/* Platform Guides */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+        {/* 3. Platform Guides */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
           {/* Windows Section */}
           <div className="p-4 rounded-xl bg-slate-900/80 border border-slate-800 hover:border-cyan-500/40 transition-all flex flex-col justify-between">
             <div>
@@ -78,28 +159,14 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
                 <span>Windows 10 / 11 Desktop</span>
                 {isWindows && <span className="text-[10px] bg-cyan-500/20 px-1.5 py-0.5 rounded text-cyan-300">Detected</span>}
               </div>
-              <p className="text-xs text-slate-400 mb-3 leading-relaxed">
-                Install as a dedicated desktop window without browser tabs or address bar. Works completely offline.
+              <p className="text-xs text-slate-400 mb-2 leading-relaxed">
+                Choose between the standalone <strong>.exe (Portable or Setup)</strong> from GitHub Releases or run as an offline PWA window.
               </p>
-              <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
-                <li>Open this app in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.</li>
-                <li>Click the <strong>Install</strong> icon in the address bar (or browser menu → <em>Apps → Install NeonLoop</em>).</li>
-                <li>NeonLoop will appear on your <strong>Start Menu</strong>, <strong>Desktop</strong>, and <strong>Taskbar</strong>!</li>
+              <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
+                <li>Run <code>NeonLoop-Portable-v*.exe</code> directly from USB or drive.</li>
+                <li>Or click <strong>Install</strong> in Chrome/Edge toolbar.</li>
+                <li>Pin to <strong>Taskbar</strong> or <strong>Start Menu</strong>!</li>
               </ol>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-              <span className="flex items-center gap-1 text-slate-300 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" /> Standalone EXE/MSI
-              </span>
-              <a
-                href="https://www.pwabuilder.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-cyan-400 hover:underline flex items-center gap-1"
-              >
-                Package with PWABuilder <ExternalLink className="w-3 h-3" />
-              </a>
             </div>
           </div>
 
@@ -111,29 +178,14 @@ export const InstallModal: React.FC<InstallModalProps> = ({ isOpen, onClose }) =
                 <span>Android Smartphone & Tablet</span>
                 {isAndroid && <span className="text-[10px] bg-blue-500/20 px-1.5 py-0.5 rounded text-blue-300">Detected</span>}
               </div>
-              <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+              <p className="text-xs text-slate-400 mb-2 leading-relaxed">
                 Installs as a native WebAPK app with full-screen experience and hardware-accelerated playback.
               </p>
-              <ol className="text-xs text-slate-300 space-y-2 list-decimal list-inside bg-slate-950/60 p-3 rounded-lg border border-slate-800/80">
+              <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/80">
                 <li>Open this app in <strong>Chrome for Android</strong>.</li>
-                <li>Tap the <strong>three dots menu (⋮)</strong> at top-right.</li>
-                <li>Tap <strong>Install App</strong> or <strong>Add to Home screen</strong>.</li>
-                <li>Confirm install; the NeonLoop app icon will appear in your app drawer!</li>
+                <li>Tap <strong>three dots (⋮)</strong> → <strong>Install App</strong>.</li>
+                <li>Icon appears in your Android home screen and app drawer!</li>
               </ol>
-            </div>
-
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400">
-              <span className="flex items-center gap-1 text-slate-300 font-medium">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-400" /> Google Play APK
-              </span>
-              <a
-                href="https://www.pwabuilder.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-blue-400 hover:underline flex items-center gap-1"
-              >
-                Generate APK <ExternalLink className="w-3 h-3" />
-              </a>
             </div>
           </div>
         </div>
