@@ -1,16 +1,11 @@
 name: Build & Release Windows App (Installer & Portable)
 
+# Only run manually on demand via GitHub Actions UI or when a version tag is pushed.
+# Normal git pushes will NOT trigger this workflow!
 on:
-  push:
-    branches:
-      - main
-      - master
-    paths-ignore:
-      - 'README.md'
-      - '.gitignore'
   workflow_dispatch:
     inputs:
-      version_type:
+      version_bump:
         description: 'Version Bump Type'
         required: true
         default: 'patch'
@@ -19,6 +14,15 @@ on:
           - patch
           - minor
           - major
+          - build_number
+      custom_version:
+        description: 'Custom Version (Optional, e.g. 1.2.0 - leaves empty to auto-bump)'
+        required: false
+        default: ''
+        type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: write
@@ -34,38 +38,53 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js Environment
+      - name: Setup Node.js 22 Environment
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
 
-      - name: Auto-Increment Version
+      - name: Determine & Bump Version
         id: versioning
         shell: bash
         run: |
-          # Read base version from package.json
-          BASE_VER=$(node -p "require('./package.json').version")
-          
-          # Auto-increment using GitHub run number for guaranteed unique sequential versions
-          MAJOR=$(echo $BASE_VER | cut -d. -f1)
-          MINOR=$(echo $BASE_VER | cut -d. -f2)
-          PATCH=${{ github.run_number }}
-          
-          NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
-          echo "Bumping version from $BASE_VER to $NEW_VERSION"
-          
-          # Update package.json version
+          # 1. Determine version
+          if [ -n "${{ github.event.inputs.custom_version }}" ]; then
+            NEW_VERSION="${{ github.event.inputs.custom_version }}"
+            echo "Using custom specified version: $NEW_VERSION"
+          elif [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            NEW_VERSION="${GITHUB_REF_NAME#v}"
+            echo "Using version from git tag: $NEW_VERSION"
+          else
+            BUMP_TYPE="${{ github.event.inputs.version_bump || 'patch' }}"
+            CURRENT_VER=$(node -p "require('./package.json').version || '1.0.0'")
+            
+            if [ "$BUMP_TYPE" = "build_number" ]; then
+              MAJOR=$(echo $CURRENT_VER | cut -d. -f1)
+              MINOR=$(echo $CURRENT_VER | cut -d. -f2)
+              NEW_VERSION="${MAJOR}.${MINOR}.${{ github.run_number }}"
+            else
+              # Use npm version to calculate next semver
+              NEW_VERSION=$(npx semver -i $BUMP_TYPE $CURRENT_VER 2>/dev/null || node -e "
+                const [maj, min, pat] = '$CURRENT_VER'.split('.').map(Number);
+                if ('$BUMP_TYPE' === 'major') console.log(\`\${maj + 1}.0.0\`);
+                else if ('$BUMP_TYPE' === 'minor') console.log(\`\${maj}.\${min + 1}.0\`);
+                else console.log(\`\${maj}.\${min}.\${pat + 1}\`);
+              ")
+            fi
+            echo "Auto-bumped ($BUMP_TYPE) from $CURRENT_VER to $NEW_VERSION"
+          fi
+
+          # 2. Update package.json version
           npm version $NEW_VERSION --no-git-tag-version --allow-same-version
-          
+
           echo "APP_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           echo "RELEASE_TAG=v$NEW_VERSION" >> $GITHUB_ENV
 
       - name: Install Project Dependencies
         shell: bash
         run: |
-          npm install
-          npm install --save-dev electron@33.2.0 electron-builder@25.1.8
+          npm install --legacy-peer-deps --no-audit --no-fund
+          npm install --save-dev --legacy-peer-deps electron@33.2.0 electron-builder@25.1.8
 
       - name: Compile Vite Frontend
         shell: bash
@@ -81,7 +100,7 @@ jobs:
       - name: Verify Generated Binaries
         shell: bash
         run: |
-          echo "Generated Windows release files:"
+          echo "Generated Windows release executables:"
           ls -lh release/*.exe
 
       - name: Generate Release Notes
@@ -91,22 +110,25 @@ jobs:
           cat << 'EOF' > RELEASE_NOTES.md
           ## 🚀 NeonLoop Media Player - Windows Release ${{ env.RELEASE_TAG }}
 
-          ### 📦 Download Options for Windows:
-          - **Portable Version (بدون نیاز به نصب):**
-            `NeonLoop-Portable-v${{ env.APP_VERSION }}.exe` (Run immediately anywhere, no installation needed)
-          - **Installer Version (نسخه نصبی ویندوز):**
-            `NeonLoop-Setup-v${{ env.APP_VERSION }}.exe` (Full Windows Setup with Start Menu and Desktop shortcuts)
+          ### 📦 فایلهای قابل دانلود برای ویندوز (Download Options for Windows):
+          - **نسخه پرتابل بدون نیاز به نصب (Portable Executable):**
+            `NeonLoop-Portable-v${{ env.APP_VERSION }}.exe`
+            *(بدون نیاز به نصب، اجرای مستقیم با دو بار کلیک از روی هر درایو یا فلش مموری)*
+          
+          - **نسخه نصبی ویندوز (Setup Installer):**
+            `NeonLoop-Setup-v${{ env.APP_VERSION }}.exe`
+            *(برنامه کامل با ویزارد نصب، ایجاد آیکون روی دسکتاپ و شورت‌کات در منوی استارت ویندوز)*
 
           ---
 
-          ### ✨ Key Features in this Release:
-          - 🔁 **Continuous Step-by-Step Looping:** Slices and repeats audio/video from 0:00 to the very end of any file length.
-          - ⚡ **Real-time Playback Speed:** Instant speed adjustments (0.25x to 3.0x) with natural pitch preservation.
-          - 🌐 **Online Network Streams:** Play online MKV, MP4, WebM, and audio URLs directly.
-          - 🎙️ **MKV Multi-Audio Switcher:** Switch between audio languages (Original, Persian dub, etc.).
-          - 📝 **Subtitles & Captions Support:** Load .SRT and .VTT files with customizable font size.
-          - 🌌 **Cyber Neon Dark Theme:** Audio-reactive ambient glow with customizable hue and lighting.
-          - 💾 **Media Exporter:** Render and export looped media directly into high-res WAV or WebM files.
+          ### ✨ ویژگی‌های نسخه ${{ env.RELEASE_TAG }}:
+          - 🔁 **تکرار خودکار بخش به بخش (Step-by-Step Looping):** برش خودکار و تکرار پشت‌سرهم فایل‌های صوتی و ویدیویی تا انتهای فایل
+          - ⚡ **کنترل مستقیم سرعت پخش:** کم و زیاد کردن سرعت (از 0.25x تا 3.0x) همراه با حفظ طبیعی تُن صدا (Pitch Preservation)
+          - 🌐 **پخش آنلاین لینک‌های اینترنتی:** پشتیبانی از لینک مستقیم ویدیوها و فایل‌های MKV, MP4, WebM و MP3
+          - 🎙️ **سوییچ بین زبان‌های صوتی (Multi-Audio Tracks):** قابلیت تغییر صوت در فایل‌های چندزبانه و افزودن صوت دوبله فارسی
+          - 📝 **پشتیبانی از زیرنویس (SRT & VTT):** نمایش تمیز زیرنویس با قابلیت تغییر سایز فونت
+          - 🌌 **تم شیک نئونی دارک:** هاله نوری و نورپردازی تطبیقی با ریتم و فرکانس‌های صدا
+          - 💾 **خروجی گرفتن از فایل تکرار شده (Export Media):** رندر و دانلود فایل صوتی (WAV) یا ویدیویی (WebM)
           EOF
 
       - name: Publish GitHub Release
