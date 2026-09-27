@@ -148,25 +148,25 @@ jobs:
           cat << 'EOF' > RELEASE_NOTES.md
           ## 🚀 NeonLoop Media Player - Windows Release ${{ env.RELEASE_TAG }}
 
-          ### 📦 فایلهای قابل دانلود برای ویندوز (Download Options for Windows):
-          - **نسخه پرتابل بدون نیاز به نصب (Portable Executable):**
+          ### 📦 Download Options for Windows:
+          - **Portable Version (No installation required):**
             `NeonLoop-Portable-v${{ env.APP_VERSION }}.exe`
-            *(بدون نیاز به نصب، اجرای مستقیم با دو بار کلیک از روی هر درایو یا فلش مموری)*
+            *(Single standalone executable. Runs instantly anywhere from any folder or USB flash drive without administrator privileges)*
           
-          - **نسخه نصبی ویندوز (Setup Installer):**
+          - **Setup Installer (Full Windows Installation):**
             `NeonLoop-Setup-v${{ env.APP_VERSION }}.exe`
-            *(برنامه کامل با ویزارد نصب استاندارد، ایجاد آیکون روی دسکتاپ و شورت‌کات در منوی استارت ویندوز)*
+            *(Standard Windows NSIS installation wizard with Desktop icon, Start Menu shortcuts, and clean uninstaller)*
 
           ---
 
-          ### ✨ ویژگی‌های نسخه ${{ env.RELEASE_TAG }}:
-          - 🔁 **تکرار خودکار بخش به بخش (Step-by-Step Looping):** برش خودکار و تکرار پشت‌سرهم فایل‌های صوتی و ویدیویی تا انتهای فایل
-          - ⚡ **کنترل مستقیم سرعت پخش:** کم و زیاد کردن سرعت (از 0.25x تا 3.0x) همراه با حفظ طبیعی تُن صدا (Pitch Preservation)
-          - 🌐 **پخش آنلاین لینک‌های اینترنتی:** پشتیبانی از لینک مستقیم ویدیوها و فایل‌های MKV, MP4, WebM و MP3
-          - 🎙️ **سوییچ بین زبان‌های صوتی (Multi-Audio Tracks):** قابلیت تغییر صوت در فایل‌های چندزبانه و افزودن صوت دوبله فارسی
-          - 📝 **پشتیبانی از زیرنویس (SRT & VTT):** نمایش تمیز زیرنویس با قابلیت تغییر سایز فونت
-          - 🌌 **تم شیک نئونی دارک:** هاله نوری و نورپردازی تطبیقی با ریتم و فرکانس‌های صدا
-          - 💾 **خروجی گرفتن از فایل تکرار شده (Export Media):** رندر و دانلود فایل صوتی (WAV) یا ویدیویی (WebM)
+          ### ✨ Key Features in Release ${{ env.RELEASE_TAG }}:
+          - 🔁 **Continuous Step-by-Step Looping:** Automatically partitions and repeats audio/video in configurable segments from 0:00 to the very end of any track length.
+          - ⚡ **Real-time Playback Speed & Pitch Preservation:** Smooth playback speed adjustment (0.25x to 3.0x) while preserving natural vocal pitch.
+          - 🌐 **Online Network Streams:** Direct playback of online MKV, MP4, WebM, MP3, and streaming URLs.
+          - 🎙️ **Multi-Audio Track Switcher:** Seamlessly switch between language audio streams in MKV files or overlay external secondary dub tracks.
+          - 📝 **Subtitles & Captions (.SRT & .VTT):** Precision subtitle rendering with customizable font sizing and timing synchronization.
+          - 💾 **Media Exporter:** Render and export looped media sequences directly into standalone lossless WAV audio or WebM video files.
+          - 🌌 **Cyber Neon Dark UI:** Audio-reactive ambient glow with custom accent hues and high-performance playback.
           EOF
 
       - name: Publish GitHub Release
