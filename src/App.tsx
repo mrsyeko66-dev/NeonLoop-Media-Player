@@ -34,7 +34,6 @@ export default function App() {
   // Media references
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const activeMediaRef = useRef<HTMLMediaElement | null>(null);
 
   // File and media state
   const [mediaSrc, setMediaSrc] = useState<string | null>(null);
@@ -53,19 +52,14 @@ export default function App() {
   const [isOpenUrlOpen, setIsOpenUrlOpen] = useState<boolean>(false);
   const [isTracksOpen, setIsTracksOpen] = useState<boolean>(false);
 
-  // Update active media reference when video or audio changes
-  useEffect(() => {
-    activeMediaRef.current = isVideo ? videoRef.current : audioRef.current;
-  }, [isVideo, mediaSrc]);
-
-  // Step looper engine hook - with live source & video awareness for full duration slicing
-  const looper = useSegmentLooper(activeMediaRef, mediaSrc, isVideo);
+  // Step looper engine hook - with direct video & audio references and live source awareness
+  const looper = useSegmentLooper(videoRef, audioRef, mediaSrc, isVideo);
 
   // Subtitles & Audio Track Switcher hook
   const mediaTracks = useMediaTracks(videoRef, looper.currentTime);
 
-  // Audio equalizer and frequency visualizer hook - with isVideo optimization
-  const audioVis = useAudioVisualizer(activeMediaRef, isVideo);
+  // Audio equalizer and frequency visualizer hook - with direct video & audio references
+  const audioVis = useAudioVisualizer(videoRef, audioRef, isVideo);
 
   // Scan embedded audio tracks when video metadata loads
   useEffect(() => {
@@ -242,7 +236,6 @@ export default function App() {
         {/* Top Player Stage */}
         <section className="w-full">
           <PlayerView
-            mediaRef={activeMediaRef}
             videoRef={videoRef}
             audioRef={audioRef}
             mediaSrc={mediaSrc}

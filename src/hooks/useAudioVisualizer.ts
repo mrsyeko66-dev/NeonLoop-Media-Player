@@ -8,7 +8,8 @@ export interface EqualizerSettings {
 }
 
 export function useAudioVisualizer(
-  mediaRef: React.RefObject<HTMLMediaElement | null>,
+  videoRef: React.RefObject<HTMLVideoElement | null>,
+  audioRef: React.RefObject<HTMLAudioElement | null>,
   isVideo = false
 ) {
   const [eq, setEq] = useState<EqualizerSettings>({
@@ -22,6 +23,7 @@ export function useAudioVisualizer(
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const connectedElementRef = useRef<HTMLMediaElement | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const bassFilterRef = useRef<BiquadFilterNode | null>(null);
   const midFilterRef = useRef<BiquadFilterNode | null>(null);
@@ -31,8 +33,16 @@ export function useAudioVisualizer(
   const lastReactiveUpdateRef = useRef<number>(0);
 
   const initWebAudio = useCallback(() => {
-    const media = mediaRef.current;
-    if (!media || sourceRef.current) return;
+    const media = isVideo ? videoRef.current : audioRef.current;
+    if (!media) return;
+
+    // If media element changed, reset previous source connection
+    if (connectedElementRef.current && connectedElementRef.current !== media) {
+      sourceRef.current = null;
+      connectedElementRef.current = null;
+    }
+
+    if (sourceRef.current) return;
 
     // For video, avoid createMediaElementSource unless user explicitly tuned EQ
     // because createMediaElementSource causes buffer latency (~80ms A/V desync in Chromium)
@@ -44,11 +54,12 @@ export function useAudioVisualizer(
       const AudioContextClass =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      const ctx = new AudioContextClass();
+      const ctx = audioCtxRef.current || new AudioContextClass();
       audioCtxRef.current = ctx;
 
       const source = ctx.createMediaElementSource(media);
       sourceRef.current = source;
+      connectedElementRef.current = media;
 
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 128;
@@ -92,7 +103,7 @@ export function useAudioVisualizer(
     } catch (e) {
       console.warn('AudioContext initialization skipped or already connected:', e);
     }
-  }, [mediaRef, isVideo, eq.bass, eq.mid, eq.treble, eq.boost]);
+  }, [isVideo, videoRef, audioRef, eq.bass, eq.mid, eq.treble, eq.boost]);
 
   // Update EQ filters
   const updateEqualizer = useCallback(
@@ -148,7 +159,6 @@ export function useAudioVisualizer(
     const updateAudioLevel = (timestamp: number) => {
       const analyser = analyserRef.current;
       if (analyser && audioCtxRef.current?.state === 'running') {
-        // Throttle React state updates to 10 FPS (every 100ms) to prevent video frame drops
         if (timestamp - lastReactiveUpdateRef.current > 100) {
           lastReactiveUpdateRef.current = timestamp;
           const data = new Uint8Array(analyser.frequencyBinCount);

@@ -13,7 +13,6 @@ import { MediaSegment, NeonThemeSettings, PlaybackMode } from '../types/player';
 import { AudioVisualizerCanvas } from './AudioVisualizerCanvas';
 
 interface PlayerViewProps {
-  mediaRef: React.RefObject<HTMLMediaElement | null>;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   audioRef: React.RefObject<HTMLAudioElement | null>;
   mediaSrc: string | null;
