@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+:root {
+  --neon-hue: 188;
+  --neon-saturation: 100%;
+  --neon-lightness: 50%;
+  --neon-color: hsl(var(--neon-hue), var(--neon-saturation), var(--neon-lightness));
+  --neon-color-dim: hsla(var(--neon-hue), var(--neon-saturation), var(--neon-lightness), 0.25);
+  --neon-color-bright: hsl(var(--neon-hue), 100%, 70%);
+  --neon-intensity: 1;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body {
+  background-color: #080c14;
+  color: #f1f5f9;
+  min-height: 100vh;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(8, 12, 20, 0.8);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.25);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-color);
+  box-shadow: 0 0 10px var(--neon-color);
+}
+
+/* Range input styling with neon track */
+input[type="range"] {
+  accent-color: var(--neon-color);
+}
+
+/* Neon glow helper classes */
+.neon-glow-sm {
+  box-shadow: 0 0 calc(8px * var(--neon-intensity)) var(--neon-color-dim);
+}
+
+.neon-glow-md {
+  box-shadow: 0 0 calc(16px * var(--neon-intensity)) var(--neon-color-dim),
+              inset 0 0 calc(8px * var(--neon-intensity)) hsla(var(--neon-hue), 100%, 50%, 0.1);
+}
+
+.neon-glow-lg {
+  box-shadow: 0 0 calc(28px * var(--neon-intensity)) hsla(var(--neon-hue), 100%, 50%, 0.35),
+              0 0 calc(50px * var(--neon-intensity)) hsla(var(--neon-hue), 100%, 50%, 0.15);
+}
+
+.neon-text-glow {
+  text-shadow: 0 0 calc(10px * var(--neon-intensity)) var(--neon-color),
+               0 0 calc(20px * var(--neon-intensity)) var(--neon-color-bright);
+}
+
+.neon-border-glow {
+  border-color: var(--neon-color);
+  box-shadow: 0 0 calc(12px * var(--neon-intensity)) var(--neon-color-dim);
+}
+
+/* Cyber grid background */
+.cyber-grid {
+  background-size: 36px 36px;
+  background-image: 
+    linear-gradient(to right, rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Pulse animation */
+@keyframes neon-pulse {
+  0%, 100% {
+    opacity: 0.85;
+    filter: drop-shadow(0 0 4px var(--neon-color));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 12px var(--neon-color));
+  }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 2.5s infinite ease-in-out;
+}

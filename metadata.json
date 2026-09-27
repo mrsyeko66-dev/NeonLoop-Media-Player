@@ -1,0 +1,6 @@
+{
+  "name": "NeonLoop Media Player",
+  "description": "Professional audio and video player with automated step-by-step segment looping, custom repetition sequences, media export, and customizable dark neon lighting for Windows and Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
